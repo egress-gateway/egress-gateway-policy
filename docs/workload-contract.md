@@ -9,10 +9,12 @@ This library implements both workload rule families through public Go values,
 before producing an artifact and performs no network or Kubernetes operations.
 
 Policy owns rule semantics, normalized input/decision contracts, fixed Rego and
-bundle construction. Controller owns the complete CRD, schema/versioning, bindings,
+bundle construction, plus policy-related normalization, decoding, descriptor
+verification and strict decision adaptation in the OPA extension. Controller owns the complete CRD, schema/versioning, bindings,
 runtime capability admission, publication and status. It may embed these types or
-map its own CRD types. Gateway owns protocol recognition, decoding, verified
-forwarding targets, normalization, bundle loading and enforcement. Networking owns
+map its own CRD types. Gateway owns verified forwarding targets and peer facts,
+TLS, lifecycle and enforcement. Upstream OPA owns bundle transport, loading,
+compilation and activation. Networking owns
 isolation and platform prerequisites. The repository also owns future shared
 egress-policy capabilities; this implementation contains only the workload baseline.
 
@@ -51,8 +53,9 @@ HTTP carrier of recognized gRPC, alongside applicable gRPC scopes.
 
 A Payload requirement needs `decode`: HTTP uses JSON, gRPC uses Protobuf with an
 HTTPS `descriptorSet.url` and `sha256:` plus 64 lowercase hex digits in `digest`.
-The library checks reference syntax only. Gateway retrieves and verifies descriptor
-bytes and checks service compatibility. A declared decoder must be ready even if
+The authoring API checks reference syntax. The Policy extension verifies explicitly
+staged descriptor bytes and checks imports, selected services and methods; it
+never fetches the reference URL. A declared decoder must be ready even if
 that constraint currently contains only attribute requirements. Without `decode`,
 attribute-only rules require no body inspection. Header/Query require HTTP scope;
 GRPCMetadata requires gRPC scope and a lowercase text key, excluding `-bin`.
@@ -74,7 +77,8 @@ the rule schema. Repeated attributes retain all values; every value must pass.
 ## Normalized input v1
 
 `workload.Input` serializes the following fields. Input is produced by the trusted
-gateway adapter, never accepted directly from the calling application.
+Policy extension (or an existing normalized-input consumer), never accepted
+directly from the calling application.
 
 | Field | Contract |
 | --- | --- |
@@ -104,8 +108,9 @@ an applicable constraint. Other statuses never make the supplied `value` usable.
 
 JSON values are complete decoded JSON. Protobuf values use standard ProtoJSON
 field names and presence/default mapping; `Exists` tests this representation and
-does not prove explicit wire presence. The adapter owns framing, decompression,
-size limits, descriptor compatibility and streaming/per-message enforcement.
+does not prove explicit wire presence. The Policy extension owns framing, body
+limits and descriptor compatibility. Its current execution contract supports only
+complete, uncompressed unary gRPC; compressed and streaming messages are rejected.
 Content-Type alone is not trusted protocol recognition and cannot disable gRPC
 constraints. Normalized library tests do not establish wire-decoding conformance.
 
@@ -135,7 +140,7 @@ Evaluate **`data.egress_gateway.workload.decision`**. Its single expression is:
 return request values or credentials. Input and config guards check runtime shape;
 full authoring bounds remain the responsibility of `Policy.Validate`/`bundle.Build`.
 These guards do not authenticate modified bundle code: gateway must load a trusted,
-verified artifact through its own loading boundary.
+artifact using OPA's standard loading boundary and the configured trust policy.
 
 Consumers must first reject OPA errors and undefined/non-single expression results.
 Encode that expression's value as JSON and call `workload.DecodeDecision`, which
@@ -168,3 +173,6 @@ used. Evaluation performs no network I/O and produces the same decision for the 
 rules and facts. Other OPA versions and byte-for-byte reproducible archive output
 are not part of this compatibility claim. `make check` runs the pure Go/Rego gates;
 publication, runtime activation and deployed traffic acceptance belong to consumers.
+
+The optional native authorization artifact and its compatibility boundary are
+documented in [OPA extension integration](opa-extension.md).

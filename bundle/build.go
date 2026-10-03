@@ -17,6 +17,17 @@ const Root = "egress_gateway/workload"
 // It performs no I/O outside the returned in-memory artifact. An error returns
 // no usable artifact. Controller owns publication and gateway owns loading.
 func Build(policy workload.Policy) ([]byte, error) {
+	return build(policy, false, "")
+}
+
+// BuildExecution includes the authorization bridge for the Policy OPA extension.
+// Revision is the publisher's identifier, exposed by OPA's native bundle status.
+// Build remains available for consumers of the normalized-input query alone.
+func BuildExecution(policy workload.Policy, revision string) ([]byte, error) {
+	return build(policy, true, revision)
+}
+
+func build(policy workload.Policy, execution bool, revision string) ([]byte, error) {
 	if err := policy.Validate(); err != nil {
 		return nil, fmt.Errorf("workload policy: %w", err)
 	}
@@ -37,7 +48,7 @@ func Build(policy workload.Policy) ([]byte, error) {
 		data["requestConstraints"] = []any{}
 	}
 	b := opabundle.Bundle{
-		Manifest: opabundle.Manifest{Roots: new([]string{Root}), RegoVersion: new(1)},
+		Manifest: opabundle.Manifest{Roots: new([]string{Root}), RegoVersion: new(1), Revision: revision},
 		Data: map[string]any{"egress_gateway": map[string]any{"workload": map[string]any{
 			"config": map[string]any{"version": workload.Version, "policy": data},
 		}}},
@@ -54,8 +65,23 @@ func Build(policy workload.Policy) ([]byte, error) {
 		b.Modules = append(b.Modules, opabundle.ModuleFile{URL: "policy/" + file.Name(), Path: "policy/" + file.Name(), Raw: source})
 	}
 	var output bytes.Buffer
+	if execution {
+		b.Data["egress_gateway"].(map[string]any)["workload"].(map[string]any)["config"].(map[string]any)["extensionVersion"] = "v1"
+		b.Modules = append(b.Modules, opabundle.ModuleFile{URL: "policy/authorization.rego", Path: "policy/authorization.rego", Raw: []byte(authorization)})
+	}
 	if err := opabundle.NewWriter(&output).Write(b); err != nil {
 		return nil, fmt.Errorf("write workload bundle: %w", err)
 	}
 	return output.Bytes(), nil
 }
+
+const authorization = `package egress_gateway.workload.authorization
+import rego.v1
+
+default allow := false
+allow if {
+ normalized := egress_gateway.inspect(input, data.egress_gateway.workload.config)
+ decision := data.egress_gateway.workload.decision with input as normalized
+ egress_gateway.accepts(decision)
+}
+`

@@ -12,8 +12,9 @@ capabilities. The implemented workload baseline follows the controller's
 - Conjunction across matching constraints, inspection failure handling, semantic
   validation and standard OPA bundle construction with fixed Rego and rule data.
 
-The library evaluates **normalized facts**, supplied by a trusted gateway adapter.
-It does not parse HTTP/JSON/gRPC wire traffic, load Protobuf descriptors, publish
+The core library evaluates **normalized facts**. The Policy-owned OPA extension
+normalizes trusted Envoy authorization facts, performs strict JSON and unary gRPC
+inspection, verifies staged descriptors and adapts decisions. It does not publish
 bundles or enforce network traffic. The external egress bundle and its composition
 are future work in this repository. A workload pass is not final egress permission.
 
@@ -37,19 +38,33 @@ flow; [shared JSON cases](testdata/workload/http-model.json) demonstrate HTTP
 payload rules and outcomes. The [YAML example](examples/workload-policy.yaml)
 contains policy fields only, not a complete GatewayProfile resource.
 
+## Native OPA integration
+
+Publish `bundle.BuildExecution(policy, revision)` for the supported extension
+path. The host calls `extension.Register()` before creating OPA and configures
+`plugins.egress_gateway_workload`; the official Envoy plugin uses
+`extension.DecisionPath` with `skip-request-body-parse: true`. Standard OPA bundle
+files or bundle services load the complete execution artifact. The host does not
+read the policy DSL, prepare descriptors or generate bridge Rego.
+
+See [extension integration and migration](docs/opa-extension.md) for configuration,
+readiness, update behavior and the staged adoption contract.
+
 ## Layout and consumers
 
 | Path | Responsibility | Direct consumer |
 | --- | --- | --- |
 | `workload/` | Public rules, configuration validation, input/decision contracts | Controller and gateway |
 | `bundle/` | Construct a workload OPA artifact from validated rules and fixed Rego | Controller and static Go callers |
+| `extension/` | Native OPA registration, policy inspection, descriptor readiness and strict authorization bridge | Gateway OPA host |
 | `internal/rego/` | Fixed workload evaluation and embedded resources | Bundle construction |
 | `testdata/workload/` | Policy/input/expected-decision examples exercised with real OPA | Semantic tests and later adapter conformance work |
 | `docs/workload-contract.md` | Serialization, normalization, compatibility and owner boundaries | Library consumers |
 
 Controller owns the complete CRD and chooses direct type reuse or explicit mapping.
-Gateway owns trustworthy forwarding targets, normalization, artifact loading and
-enforcement. No Kubernetes or Envoy types are required by the public API.
+Gateway owns trustworthy forwarding targets and peer facts, TLS, process lifecycle
+and enforcement. Upstream OPA owns bundle transport, compilation and activation.
+The authoring/input/decision API remains independent of Kubernetes and Envoy.
 
 ## Development
 
@@ -63,6 +78,8 @@ make check
 
 This checks formatting and runs `go vet`, `go test` and `go build`. Tests build
 and load the actual bundle and evaluate the public decision query with OPA.
-These are pure library checks; deployed protocol/streaming acceptance belongs to
-later gateway integration. CI runs the same command. CodeRabbit automatically
+Core tests establish pure policy semantics. Extension tests exercise actual
+OPA and the official Envoy authorization service, native bundle updates and
+recovery. Deployed traffic, mesh identity and isolation acceptance belongs to
+Gateway integration. CI runs the same command. CodeRabbit automatically
 reviews non-Draft PRs.

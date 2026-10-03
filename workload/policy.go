@@ -52,8 +52,8 @@ const (
 	Protobuf Format = "Protobuf"
 )
 
-// Decoder declares the inspection needed by a constraint. Policy does not
-// perform wire decoding or fetch artifacts.
+// Decoder declares the inspection needed by a constraint. The Policy OPA
+// extension performs decoding from trusted request facts and staged descriptors.
 type Decoder struct {
 	Format        Format       `json:"format"`
 	DescriptorSet *ArtifactRef `json:"descriptorSet,omitempty"`
