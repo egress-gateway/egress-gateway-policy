@@ -1,7 +1,4 @@
-// Package bundle is reserved for constructing workload OPA bundles from shared
-// policy data and the project's fixed baseline Rego implementation.
-//
-// Construction will use explicit inputs without network access or publication.
-// Controller owns publication and desired configuration; gateway owns loading
-// and enforcement. This scaffold does not yet expose a construction function.
+// Package bundle constructs standard workload OPA snapshot bundles from validated
+// workload.Policy values and fixed Rego v1. Build performs no external I/O.
+// Controller owns publication; gateway owns trusted loading and enforcement.
 package bundle

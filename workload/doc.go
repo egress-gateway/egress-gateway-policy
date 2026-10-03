@@ -1,10 +1,6 @@
-// Package workload is reserved for shared workload-policy structures, semantic
-// validation, normalized request inputs, and baseline decisions.
-//
-// Controller will reuse the policy structures in GatewayProfile.spec.workloadPolicy.
-// Gateway will produce normalized inputs and consume the decision contract. These
-// contracts remain independent of Kubernetes resources and Envoy transport types.
-//
-// This scaffold documents ownership only; no policy types or functions are
-// implemented yet. See docs/workload-contract.md for the intended semantics.
+// Package workload defines workload-policy rules, configuration validation and
+// versioned normalized input and decision contracts independent of Kubernetes
+// and Envoy. Controller maps or embeds Policy; gateway produces Input, evaluates
+// a bundle and consumes Decision using DecodeDecision. A pass covers the workload
+// baseline only. See docs/workload-contract.md for normalization and error handling.
 package workload
