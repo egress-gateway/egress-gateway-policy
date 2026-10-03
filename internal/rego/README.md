@@ -9,5 +9,6 @@ The private embedding package supplies Rego v1 modules to `bundle.Build`:
 
 Go validates rule authoring and assembles artifacts. Authorization evaluation lives
 here. Tests under `bundle/` exercise these modules through the actual public builder
-and OPA, including error paths. Parsing, decoding and enforcement belong to gateway;
-publication and CRD reconciliation belong to controller.
+and OPA, including error paths. The Policy extension owns policy-related parsing
+and decoding, and `bundle.BuildExecution` adds the authorization bridge. Gateway
+owns enforcement; publication and CRD reconciliation belong to controller.
