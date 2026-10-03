@@ -1,0 +1,23 @@
+# Design example of GatewayProfile.spec.workloadPolicy only.
+# No executable policy or public construction API exists in this scaffold.
+hostDenylist:
+  - type: Exact
+    value: blocked.example.com
+  - type: DomainSuffix
+    value: restricted.example.org
+requestConstraints:
+  - name: restrict-model
+    match:
+      hosts:
+        - type: Exact
+          value: llm.example.com
+      http:
+        methods: [POST]
+        paths: [/v1/chat/completions, /v1/responses]
+    decode:
+      format: JSON
+    require:
+      - source: Payload
+        pointer: /model
+        operator: In
+        values: [model-small, model-large]
