@@ -1,0 +1,160 @@
+{
+  "policy": {
+    "requestConstraints": [
+      {
+        "name": "model",
+        "match": {
+          "hosts": [
+            {
+              "type": "Exact",
+              "value": "api.example"
+            }
+          ],
+          "http": {
+            "methods": [
+              "POST"
+            ],
+            "paths": [
+              "/v1"
+            ]
+          }
+        },
+        "decode": {
+          "format": "JSON"
+        },
+        "require": [
+          {
+            "source": "Payload",
+            "pointer": "/model",
+            "operator": "In",
+            "values": [
+              "small"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "allowed-model",
+      "input": {
+        "version": "v1",
+        "host": "api.example",
+        "protocol": "HTTP",
+        "http": {
+          "method": "POST",
+          "path": "/v1",
+          "headers": {},
+          "query": {}
+        },
+        "payloads": [
+          {
+            "format": "JSON",
+            "status": "Ready",
+            "value": {
+              "model": "small"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "version": "v1",
+        "allowed": true,
+        "code": "pass",
+        "violations": []
+      }
+    },
+    {
+      "name": "blocked-model",
+      "input": {
+        "version": "v1",
+        "host": "api.example",
+        "protocol": "HTTP",
+        "http": {
+          "method": "POST",
+          "path": "/v1",
+          "headers": {},
+          "query": {}
+        },
+        "payloads": [
+          {
+            "format": "JSON",
+            "status": "Ready",
+            "value": {
+              "model": "large"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "version": "v1",
+        "allowed": false,
+        "code": "deny",
+        "violations": [
+          "requestConstraints/model"
+        ]
+      }
+    },
+    {
+      "name": "missing-model",
+      "input": {
+        "version": "v1",
+        "host": "api.example",
+        "protocol": "HTTP",
+        "http": {
+          "method": "POST",
+          "path": "/v1",
+          "headers": {},
+          "query": {}
+        },
+        "payloads": [
+          {
+            "format": "JSON",
+            "status": "Ready",
+            "value": {}
+          }
+        ]
+      },
+      "expected": {
+        "version": "v1",
+        "allowed": false,
+        "code": "deny",
+        "violations": [
+          "requestConstraints/model"
+        ]
+      }
+    },
+    {
+      "name": "null-model",
+      "input": {
+        "version": "v1",
+        "host": "api.example",
+        "protocol": "HTTP",
+        "http": {
+          "method": "POST",
+          "path": "/v1",
+          "headers": {},
+          "query": {}
+        },
+        "payloads": [
+          {
+            "format": "JSON",
+            "status": "Ready",
+            "value": {
+              "model": null
+            }
+          }
+        ]
+      },
+      "expected": {
+        "version": "v1",
+        "allowed": false,
+        "code": "deny",
+        "violations": [
+          "requestConstraints/model"
+        ]
+      }
+    }
+  ]
+}

@@ -1,12 +1,13 @@
 # Fixed workload baseline
 
-This directory will contain the shared baseline Rego implementation and its Go
-embedding boundary. Planned modules cover host matching, request constraints,
-and the combined baseline decision.
+The private embedding package supplies Rego v1 modules to `bundle.Build`:
 
-The bundle package will consume these resources through a private Go package.
-No executable Rego or embedding code exists in this scaffold. Add each module
-with tests for its actual semantics instead of placeholder allow decisions.
+- `hosts.rego`: exact/suffix matching and denylist checks.
+- `constraints.rego`: scope composition, required inspection and selection/operators.
+- `validation.rego`: structural bundle-data and normalized-input guards.
+- `workload.rego`: versioned decision at `data.egress_gateway.workload.decision`.
 
-Rule evaluation belongs here. Request parsing and decoding remain in gateway;
-policy publication and Kubernetes reconciliation remain in controller.
+Go validates rule authoring and assembles artifacts. Authorization evaluation lives
+here. Tests under `bundle/` exercise these modules through the actual public builder
+and OPA, including error paths. Parsing, decoding and enforcement belong to gateway;
+publication and CRD reconciliation belong to controller.

@@ -1,5 +1,5 @@
-# Design example of GatewayProfile.spec.workloadPolicy only.
-# No executable policy or public construction API exists in this scaffold.
+# Policy fields only; controller owns the complete GatewayProfile resource.
+# Construct these fields with workload.Policy and build them with bundle.Build.
 hostDenylist:
   - type: Exact
     value: blocked.example.com

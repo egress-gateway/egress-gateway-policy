@@ -1,65 +1,68 @@
 # Egress Gateway Policy
 
-Shared workload-policy contracts and baseline policy implementation for Egress
-Gateway. The design follows the controller's
+The shared OPA policy layer for Egress Gateway's workload and future egress
+capabilities. The implemented workload baseline follows the controller's
 [GatewayProfile CRD specification](https://github.com/egress-gateway/egress-gateway-controller/wiki/GatewayProfile-CRD-Design).
 
-## Status
+## Supported workload rules
 
-This repository currently contains a directory framework, package documentation,
-a design example, and basic Go checks. Public policy types, construction APIs,
-semantic validation, executable Rego and bundle generation are not implemented.
-It does not yet enforce a policy or complete V01-04 acceptance.
+- `hostDenylist`: exact and DNS-label-boundary suffix destination matching.
+- `requestConstraints`: HTTP and gRPC scopes, JSON and ProtoJSON payload facts,
+  payload/header/query/text-metadata selection, and `In`, `NotIn`, `Exists`.
+- Conjunction across matching constraints, inspection failure handling, semantic
+  validation and standard OPA bundle construction with fixed Rego and rule data.
 
-The initial scope is the structured `workloadPolicy` baseline:
+The library evaluates **normalized facts**, supplied by a trusted gateway adapter.
+It does not parse HTTP/JSON/gRPC wire traffic, load Protobuf descriptors, publish
+bundles or enforce network traffic. The external egress bundle and its composition
+are future work in this repository. A workload pass is not final egress permission.
 
-- `hostDenylist`: exact and domain-suffix destination restrictions.
-- `requestConstraints`: request matching, optional decoding requirements, and
-  conjunctive `In`, `NotIn` and `Exists` requirements.
+## Use
 
-The current task does not implement the external, gateway-only egress bundle.
-The same workload baseline is intended to run at both the workload proxy and
-egress gateway; its repository ownership is independent of that later integration.
+```go
+policy := workload.Policy{
+    HostDenylist: []workload.HostMatcher{
+        {Type: workload.DomainSuffix, Value: "restricted.example"},
+    },
+}
+archive, err := bundle.Build(policy) // validates; no external I/O
+```
+
+Load the returned snapshot bundle with OPA and evaluate
+`data.egress_gateway.workload.decision` with a `workload.Input`. Treat OPA errors,
+undefined/multiple results and invalid decisions as failure. Pass the single
+expression's JSON value to `workload.DecodeDecision` before using `Allowed`.
+The executable [Go example](bundle/example_test.go) demonstrates this complete
+flow; [shared JSON cases](testdata/workload/http-model.json) demonstrate HTTP
+payload rules and outcomes. The [YAML example](examples/workload-policy.yaml)
+contains policy fields only, not a complete GatewayProfile resource.
 
 ## Layout and consumers
 
 | Path | Responsibility | Direct consumer |
 | --- | --- | --- |
-| `workload/` | Shared policy structures, semantic validation, normalized request input and baseline decision contracts | Controller and gateway |
-| `bundle/` | Construct a workload OPA bundle from policy data and fixed Rego | Controller and static integration callers |
-| `internal/rego/` | Fixed baseline rule implementation and embedded resources | The bundle package |
-| `testdata/workload/` | Shared policy/input/expected-decision examples for semantic tests | Policy tests and later adapter conformance work |
-| `examples/` | Human-readable workload policy examples | Policy authors and Go consumers |
-| `docs/workload-contract.md` | Contract source, semantic boundaries and planned API responsibilities | Implementers and consumers |
+| `workload/` | Public rules, configuration validation, input/decision contracts | Controller and gateway |
+| `bundle/` | Construct a workload OPA artifact from validated rules and fixed Rego | Controller and static Go callers |
+| `internal/rego/` | Fixed workload evaluation and embedded resources | Bundle construction |
+| `testdata/workload/` | Policy/input/expected-decision examples exercised with real OPA | Semantic tests and later adapter conformance work |
+| `docs/workload-contract.md` | Serialization, normalization, compatibility and owner boundaries | Library consumers |
 
-Controller owns the complete Kubernetes CRD and reuses the shared policy fields.
-Gateway supplies trustworthy normalized request facts and enforces decisions.
-The intended flow is:
-
-```text
-GatewayProfile.spec.workloadPolicy or a static Go caller
-  -> shared workload structures and validation
-  -> bundle construction with fixed Rego
-  -> consumer-owned publication/loading
-  -> OPA evaluation using gateway-normalized input
-  -> gateway enforcement
-```
-
-See the [workload contract](docs/workload-contract.md) and
-[design example](examples/workload-policy.yaml). The example is not a complete
-GatewayProfile resource or an executable bundle.
+Controller owns the complete CRD and chooses direct type reuse or explicit mapping.
+Gateway owns trustworthy forwarding targets, normalization, artifact loading and
+enforcement. No Kubernetes or Envoy types are required by the public API.
 
 ## Development
 
-Use Go 1.26 or newer; CI uses Go 1.26.7. This scaffold has no third-party Go
-dependencies. Runtime integration must select an OPA version compatible with
-the consuming gateway when executable policy work begins.
+Go 1.26 or newer is required; CI uses Go 1.26.7. OPA **1.20.2**, matching the
+existing gateway dependency, is the tested runtime; bundles use **Rego v1**.
+Compatibility with other runtime versions is not asserted.
 
 ```sh
 make check
 ```
 
-This runs formatting checks, `go vet`, `go test` and `go build`. At this stage,
-the Go packages contain documentation only and there are no behavior tests.
-CI runs the same command. CodeRabbit configuration matches the gateway
-repository: automatic incremental reviews are enabled for non-Draft PRs.
+This checks formatting and runs `go vet`, `go test` and `go build`. Tests build
+and load the actual bundle and evaluate the public decision query with OPA.
+These are pure library checks; deployed protocol/streaming acceptance belongs to
+later gateway integration. CI runs the same command. CodeRabbit automatically
+reviews non-Draft PRs.
